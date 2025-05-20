@@ -1,44 +1,54 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
-from typing import List
+from fastapi import FastAPI , Path , HTTPException , Query
+import json
 
 
 app = FastAPI()
 
-#data types 
-class Tea(BaseModel):
-  id:int
-  name:str
-  origin:str
+def load_data():
+  with open('patients.json', 'r') as f:
+    data = json.load(f)
+  return data
 
-# teas is a list , which includes Tea datatypes
-teas:List[Tea]=[]
 
 @app.get("/")
 def read_root():
-  return {"message":"welcome to tea house"}
+  return {"message":"Patient management system"}
 
-@app.get("/teas")
+@app.get("/about")
 def get_teas():
-  return teas
+  return {"message":"A fully functional API to manage your patient"}
 
-@app.post("/teas")
-def add_tea(tea:Tea):
-  teas.append(tea)
-  return tea
+@app.get("/view")
+def get_patients():
+  data= load_data()
+  return data
 
-@app.put("/teas/${tea_id}")
-def update_tea(tea_id:int , updated_tea:Tea):
-  for index, tea in enumerate(teas):
-    if tea.id==tea_id:
-      teas[index]=update_tea
-      return update_tea
-  return {"error":"Tea not found"}
+@app.get('/patient/{patient_id}')
+def view_patient(patient_id: str = Path(..., description='ID of the patient in the DB', example='P001')):
+    data = load_data()
+    if patient_id in data:
+        return data[patient_id]
+    raise HTTPException(status_code=404, detail='Patient not found')
 
-@app.delete("/teas/{tea_id}")
-def delete_tea(tea_id:int):
-  for index , tea in enumerate(teas):
-    if tea.id==tea_id:
-      teas.pop(index)
-      return{"message":"Tea deleted successfully"} 
-  return {"error":"Tea not found"}
+
+@app.get('/sort')
+def sort_patients(sort_by: str = Query(..., description='Sort on the basis of height, weight or bmi'), order: str = Query('asc', description='sort in asc or desc order')):
+
+    valid_fields = ['height', 'weight', 'bmi']
+
+    if sort_by not in valid_fields:
+        raise HTTPException(status_code=400, detail=f'Invalid field select from {valid_fields}')
+    
+    if order not in ['asc', 'desc']:
+        raise HTTPException(status_code=400, detail='Invalid order select between asc and desc')
+    
+    data = load_data()
+
+    sort_order = True if order=='desc' else False
+
+    sorted_data = sorted(data.values(), key=lambda x: x.get(sort_by, 0), reverse=sort_order)
+
+    return sorted_data
+
+
+
